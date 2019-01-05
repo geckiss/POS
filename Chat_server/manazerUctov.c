@@ -49,21 +49,22 @@ int pocetZiadostiZP = 0;
 int pocetSprav = 0;
 //struct sockaddr_in serv_addr;
 
-int prihlasenie(const char* prihlasNick, const char* prihlasHeslo, void* prihlaseni_p, void* registrovani_p) {
-    uzivatel** prihlaseni = (uzivatel**)prihlaseni_p;
-    uzivatel** registrovani = (uzivatel**)registrovani_p;
-    
-    if (prihlasNick > 0 && prihlasHeslo > 0) {
-        for (int i = 0; i < pocetAktualPrihlasenych; i++) {
+int prihlasenie(char* prihlasNick, char* prihlasHeslo, uzivatel** prihlaseni, uzivatel** registrovani) {
+    //if (prihlasNick > 0 && prihlasHeslo > 0) {
+        for (int i = 0; i < pocetRegistrovanych; i++) {
             if (strcmp(registrovani[i]->nick, prihlasNick) == 0) {
+                printf("dobry nick\n");
                 if (strcmp(registrovani[i]->heslo, prihlasHeslo) == 0) {
+                    printf("dobre heslo\n");
                     // Prihlasenie
-                    prihlaseni[pocetAktualPrihlasenych++] = registrovani[i];
+                    prihlaseni[pocetAktualPrihlasenych] = registrovani[i];
+                    ++pocetAktualPrihlasenych;
                     return pocetAktualPrihlasenych;
                 }
             }
         }
-    }
+    //}
+    printf("ziadna zhoda\n");
     return 0;
 }
 
@@ -85,25 +86,25 @@ int registracia(const char* registrujNick, const char* registrujHeslo, uzivatel*
         for (int i = 0; i < pocetRegistrovanych; i++) {
             // Uz je registrovany
             if (strcmp(registrovani[i]->nick, registrujNick) == 0) {
+                printf("Registracia: uzivatel uz existuje\n");
                 return 2;
             }
         }
-        printf("Kontrola OK\n");
         uzivatel* novy = (uzivatel*)malloc(sizeof(uzivatel));
-        printf("novy uzivatel OK\n");
+        
         novy->nick = (char*)malloc(sizeof(char) * 20);
         strcpy(novy->nick, (char*)registrujNick);
-        printf("novy nick OK\n");
+        
         novy->heslo = (char*)malloc(sizeof(char) * 20);
         strcpy(novy->heslo, (char*)registrujHeslo);
-        printf("nove heslo OK\n");
+        
         novy->priatelia = (char**)malloc(sizeof(char*)*(POCET_UZIVATELOV-1));
-        printf("novy priatelia OK\n");
-        // potom este malokovat ten char*(nick), dostane smernik, a ten priradit do priatelov
+
         novy->pocetPriatelov = 0;
         novy->cisloSocketu = socket;
+        
         registrovani[pocetRegistrovanych++] = novy;
-        printf("%d\n", pocetRegistrovanych);
+        printf("Registracia ok, count: %d\n", pocetRegistrovanych);
         return 1;
     }
     return 0;
@@ -248,10 +249,32 @@ void* zrusPriatela(void* pdata) {
     return NULL;
 }
 
-void* posliZiadosti(void* pdata) {
-    full_ziadost* fz = (full_ziadost*)pdata;
-    char *odpoved_clienta, *msg;       // Y/N
+void* posliZiadosti(full_ziadost* fz) {
     int maZiadosti, n;
+    
+    // poslem pocet priatelov
+    int c = fz->komu->pocetPriatelov; 
+    char buff[255];
+    sprintf(buff, "%d", c);
+    printf(buff);
+    printf("\n");
+    printf(c);
+    printf("\n");
+    
+    n = write(fz->odpoved_socket, buff, 3);
+    printf("poslal som pocet priatelov, %d\n", c);
+    usleep(500000);
+    bzero(buff, 20);
+    for (int i = 0; i < fz->komu->pocetPriatelov; i++) {
+        strcat(buff, fz->komu->priatelia[i]);
+        n = write(fz->odpoved_socket, buff, strlen(buff)+1);
+        printf("poslal som nick priatela\n");
+        usleep(500000);
+    }
+    printf("posielanie priatelov dokoncene\n\n");
+    
+    char *odpoved_clienta, *msg;       // Y/N
+    
     
     if (fz->pocetZiadosti > 0) {
         maZiadosti = 1;
@@ -268,19 +291,9 @@ void* posliZiadosti(void* pdata) {
     
     
     n = write(fz->odpoved_socket, msg, strlen(msg)+1);
-    n = read(fz->odpoved_socket, odpoved_clienta, 2);   // len OK
-    
-    // poslem pocet priatelov
-    int c = fz->komu->pocetPriatelov; 
-    char buff[20];
-    n = write(fz->odpoved_socket, c, 2);
-    
-    for (int i = 0; i < fz->komu->pocetPriatelov; i++) {
-        strcat(buff, fz->komu->priatelia[i]);
-        n = write(fz->odpoved_socket, buff, strlen(buff)+1);
-    }
-    
-    
+    printf("poslal som ze ci ma ziadosti\n");
+    usleep(500000);
+    //n = read(fz->odpoved_socket, odpoved_clienta, 2);   // len OK
     
     for (int i = 0; i < fz->pocetZiadosti; i++) {
         // sockety na clienta
@@ -293,8 +306,10 @@ void* posliZiadosti(void* pdata) {
             
             // poslem mu spravu
             n = write(fz->odpoved_socket, msg, strlen(msg)+1);
+            printf("poslal som mu ziadost o pria\n");
             // cakam, ci Y priatelstvo alebo N
             n = read(fz->odpoved_socket, odpoved_clienta, 1);       // 2 ? null terminating ?
+            printf("prisla mi odpoved\n");
             
         }
     }
@@ -331,29 +346,41 @@ void* jePrihlaseny(const char* nick, void* prihlaseni_p) {
 }
 
 void* obsluzClienta(void *pdata) {
+    int koniec = 0;
     char buffer[256];
+    char save_buffer[256];
+    int n;
     client_data* client = (client_data*)pdata;
-    bzero(buffer, 256);
 
-    int n = read(client->socket, buffer, 255);
-    if (n < 0) {
-        perror("Error reading from socket\n");
-        return NULL;
-    }
 
-    printf("precital som zo socketu\n");
-    strcpy(client->save_buffer, buffer);
+    while (koniec == 0) {
+        n = 0;
+        bzero(buffer, 256);
+        
+        n = read(client->socket, buffer, 255);
+        printf("precital som zo socketu\n");
+        if (n < 0) {
+            perror("Error reading from socket\n");
+            return NULL;
+        }
 
+    
+    //strcpy(save_buffer, buffer);          // hadze segmentation fault
+    //printf("save hotovy");
     // Rozlisujem prihlasenie, registraciu, odhlasenie, vymazanie uctu, 
     // pridaj priatela(A), zrus priatela(Z), spravu(S)
     //printf(buffer);
-    if ((client->buffer)[0] == 'P' || (client->buffer)[0] == 'R' || 
-        (client->buffer)[0] == 'O' || (client->buffer)[0] == 'V' || 
-        (client->buffer)[0] == 'A' || (client->buffer)[0] == 'Z' || 
-        (client->buffer)[0] == 'S') {
+    printf("\n");
+    char *option = strtok(buffer, "|");
+    if (*option == 'P' || *option == 'R' || 
+        *option == 'O' || *option == 'V' || 
+        *option == 'A' || *option == 'Z' || 
+        *option == 'S') {
 
+        //printf("Precital som option - je dobra\n");
         // odstranim option, buffer bude iba option
-        char *option = strtok(client->buffer, "|");
+        
+        char msg[256];
         int uspechVymaz;
         char *komu_nick;
         char *koho_nick;
@@ -364,51 +391,140 @@ void* obsluzClienta(void *pdata) {
             case 'P':
                 client->nick = strtok(NULL, "|");
                 client->heslo = strtok(NULL, "|");
-                client->uspech = prihlasenie(client->nick, client->heslo, client->prihlaseni, client->registrovani);
-                if (client->uspech) {
-                    client->msg = "Boli ste uspesne prihlaseny.";
-
+                printf("prihlasujem ho\n");
+                client->uspech = 0;
+                for (int i = 0; i < pocetRegistrovanych; i++) {
+                    if (strcmp(client->registrovani[i]->nick, client->nick) == 0) {
+                            printf("dobry nick\n");
+                            if (strcmp(client->registrovani[i]->heslo, client->heslo) == 0) {
+                                printf("dobre heslo\n");
+                                // Prihlasenie
+                                client->prihlaseni[pocetAktualPrihlasenych] = client->registrovani[i];
+                                ++pocetAktualPrihlasenych;
+                                client->uspech = pocetAktualPrihlasenych;
+                            }
+                        }
+                }
+                
+                //client->uspech = prihlasenie(client->nick, client->heslo, client->prihlaseni, client->registrovani);
+                
+                if (client->uspech != 0) {
+                    printf("posielam, ze prihlasenie uspesne\n");
+                    usleep(2000000);
+                    strcpy(msg, "OK");
+                    
+                    n = write(client->socket, msg, strlen(msg) + 1);
+                    usleep(500000);
+                    
                     full_ziadost* fz = (full_ziadost*)malloc(sizeof (full_ziadost));
                     fz->komu = client->prihlaseni[client->uspech - 1];
+                    printf("nick prihlaseneho je %s\n", fz->komu->nick);
                     fz->ziadosti = client->ziadosti_op;
                     fz->pocetZiadosti = pocetZiadostiOP;
                     fz->odpoved_socket = client->socket;
 
-                    posliZiadosti(fz);
+                    int maZiadosti;
+    
+    // poslem pocet priatelov
+                        int c = fz->komu->pocetPriatelov;
+                        printf("c je %d", c);
+                        char buff[255];
+                        sprintf(buff, "%d", c);
+                        printf(buff);
+                        printf("\n");
+
+                        n = write(fz->odpoved_socket, buff, 3);
+                        printf("poslal som pocet priatelov, %d\n", c);
+                        usleep(500000);
+                        bzero(buff, 20);
+                        for (int i = 0; i < c; i++) {
+                            strcat(buff, fz->komu->priatelia[i]);
+                            n = write(fz->odpoved_socket, buff, strlen(buff) + 1);
+                            printf("poslal som nick priatela\n");
+                            usleep(500000);
+                        }
+                        printf("posielanie priatelov dokoncene\n\n");
+
+                        char odpoved_clienta[256];
+                        
+
+
+                        if (fz->pocetZiadosti > 0) {
+                            maZiadosti = 1;
+                        } else {
+                            maZiadosti = 0;
+                        }
+
+                        if (maZiadosti) {
+                            strcpy(msg, "Z|");
+                            sprintf(msg, "%d", fz->pocetZiadosti);
+                        } else {
+                            strcpy(msg, "OK|");
+                        }
+
+
+                        n = write(fz->odpoved_socket, msg, strlen(msg) + 1);
+                        printf("poslal som ze ci ma ziadosti\n");
+                        usleep(500000);
+                        //n = read(fz->odpoved_socket, odpoved_clienta, 2);   // len OK
+
+                        for (int i = 0; i < fz->pocetZiadosti; i++) {
+                            // sockety na clienta
+                            if (fz->komu->nick == fz->ziadosti[i]->komu->nick) {
+                                bzero(odpoved_clienta, 256);
+                                // ziadost o priatelstvo
+                                // socket na clienta
+                                // char* msg = "Mate ziadost o priatelstvo od " + fz->ziadosti[i]->odKoho;
+                                strcpy(msg, "Mate ziadost o priatelstvo od ");
+                                strcat(msg, fz->ziadosti[i]->koho->nick);
+
+                                // poslem mu spravu
+                                n = write(fz->odpoved_socket, msg, strlen(msg) + 1);
+                                printf("poslal som mu ziadost o pria\n");
+                                // cakam, ci Y priatelstvo alebo N
+                                n = read(fz->odpoved_socket, odpoved_clienta, 1); // 2 ? null terminating ?
+                                printf("prisla mi odpoved\n");
+
+                            }
+                        }
+                    //posliZiadosti(fz);
 
                     free(fz);
-
                 } else {
-                    client->msg = "NOK";
-                    n = write(client->socket, client->msg, strlen(client->msg) + 1);
+                    strcpy(msg, "NOK");
+                    n = write(client->socket, msg, strlen(msg) + 1);
                 }
+                 
+                
+                
                 break;
 
             case 'R':
                 client->nick = strtok(NULL, "|");
                 client->heslo = strtok(NULL, "|");
+                printf("registrujem ho\n");
                 client->uspech = registracia((const char*)client->nick, (const char*)client->heslo, client->registrovani, client->socket);
-                if (client->uspech) { // 1
-                    strcpy(client->msg, "OK");
-                    // TODO server-side: automaticky ho prihlas?
+                if (client->uspech == 1) { // 1
+                    strcpy(msg, "OK");
                 } else {
                     if (client->uspech == 2) {
                         // duplicitny nick
-                        strcpy(client->msg, "DUP");
+                        strcpy(msg, "DUP");
                     } else {
                         // 0
-                        strcpy(client->msg, "NOK");
+                        strcpy(msg, "NOK");
                     }
                 }
-                n = write(client->socket, client->msg, strlen(client->msg) + 1);
+                n = write(client->socket, msg, strlen(msg) + 1);
                 break;
 
             case 'O':
+                koniec = 1;
                 client->uspech = odhlasenie(client->nick, client->prihlaseni);
                 if (client->uspech) {
-                    client->msg = "Boli ste uspesne odhlaseny.";
+                    strcpy(msg, "OK");
                 } else {
-                    client->msg = "Odhlasenie NEUSPESNE, zly nick!";
+                    strcpy(msg, "NOK");
                 }
                 break;
 
@@ -421,11 +537,11 @@ void* obsluzClienta(void *pdata) {
                     uspechVymaz = zrusenieUctu(client->nick, client->registrovani);
                 }
                 if (uspechVymaz) {
-                    client->msg = "OK";
+                    strcpy(msg, "OK");
                 } else {
-                    client->msg = "NOK";
+                    strcpy(msg, "NOK");
                 }
-                n = write(client->socket, client->msg, strlen(client->msg) + 1);
+                n = write(client->socket, msg, strlen(client->msg) + 1);
                 break;
 
             case 'A':
@@ -523,4 +639,6 @@ void* obsluzClienta(void *pdata) {
     } else {
         printf("Zly format socketu - zle option: %s\n", client->buffer);
     }
+    }
+    close(client->socket);
 }

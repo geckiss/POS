@@ -56,7 +56,6 @@ typedef struct {
 
 typedef struct {
     char *buffer;
-    char *save_buffer;
     char *nick;
     char *heslo;
     char* komu_nick;
@@ -73,7 +72,7 @@ typedef struct {
     message** messages;
 } client_data;
 
-int prihlasenie(const char* prihlasNick, const char* prihlasHeslo, void* prihlaseni_p, void* registrovani_p);
+int prihlasenie(char* prihlasNick, char* prihlasHeslo, uzivatel** prihlaseni_p, uzivatel** registrovani_p);
 
 int odhlasenie(const char* nick, void* prihlaseni_p);
 
@@ -91,7 +90,7 @@ void* zrusPriatela(void* pdata);
 
 void vypisPriatelov(void* uziv);
 
-void* posliZiadosti(void* pdata);
+void* posliZiadosti(full_ziadost* pdata);
 
 void* najdiUziPodlaNicku(const char* nick, void* registrovani_p);
 

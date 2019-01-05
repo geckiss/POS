@@ -104,25 +104,31 @@ int main(int argc, char *argv[])
     }
     printf("Bind OK\n");
     
+    listen(sockfd, 5);
     while (1) {
-        printf("sockfd: %d\n", sockfd);
-        listen(sockfd, 5);
+        
         cli_len = sizeof (cli_addr);
-
+        printf("Cakam na accept\n");
         newsockfd = accept(sockfd, (struct sockaddr*) &cli_addr, &cli_len);
         if (newsockfd < 0) {
             perror("ERROR on accept\n");
             return 3;
         }
         printf("Accept OK\n");
-        printf("sockfd: %d\n", sockfd);
-        printf("newsockfd: %d\n", newsockfd);
         client_data* cdata = (client_data*) malloc(sizeof (client_data));
         cdata->socket = newsockfd;
+        cdata->nick = (char*)malloc(sizeof(char)*20);
+        cdata->heslo = (char*)malloc(sizeof(char)*20);
+        cdata->ziadosti_op = ziadosti_op;
+        cdata->registrovani = registrovani;
+        cdata->prihlaseni = prihlaseni;
+        cdata->ziadosti_zp = ziadosti_zp;
+        cdata->messages = messages;
         
         pthread_t vlakno;
         vlaknaZiadosti[pocetVlakienZOP++] = vlakno;
-        pthread_create(&vlakno, NULL, &obsluzClienta, &cdata);
+        printf("Idem do vlakna\n\n");
+        pthread_create(&vlakno, NULL, &obsluzClienta, cdata);
     }
     // koniec while-u ???
 
@@ -130,7 +136,7 @@ int main(int argc, char *argv[])
     // TODO vsetky sockety uzivatelov zatvorit
     // TODO vycisti struktury
     // close vracia int
-    close(newsockfd);
+    
     close(sockfd);
     return 0;
 }
