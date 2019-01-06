@@ -74,11 +74,11 @@ typedef struct {
 
 int prihlasenie(char* prihlasNick, char* prihlasHeslo, uzivatel** prihlaseni_p, uzivatel** registrovani_p);
 
-int odhlasenie(const char* nick, void* prihlaseni_p);
+int odhlasenie(char* nick, uzivatel** prihlaseni_p);
 
 int registracia(const char* registrujNick, const char* registrujHeslo, uzivatel** registrovani_p, int socket);
 
-int zrusenieUctu(const char* zrusNick, void* registrovani_p);
+int zrusenieUctu(char* zrusNick, uzivatel** registrovani_p);
 
 void swapOdhlasenie(int indexNekoncovy, void* prihlaseni_p);
 
@@ -94,7 +94,7 @@ void* posliZiadosti(full_ziadost* pdata);
 
 void* najdiUziPodlaNicku(const char* nick, void* registrovani_p);
 
-void* jePrihlaseny(const char* nick, void* prihlaseni_p);
+void* jePrihlaseny(char* nick, uzivatel** prihlaseni_p);
 
 void* obsluzClienta(void* pdata);
 

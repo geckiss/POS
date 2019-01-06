@@ -41,6 +41,7 @@ typedef struct message_p {
 } message;
 */
 int pocetVlakienZOP = 0;
+int loggedInCount = 0;
 //int prihlasenie(const char* nick, const char* heslo);,
 
 int main(int argc, char *argv[])
@@ -60,18 +61,12 @@ int main(int argc, char *argv[])
     message** messages = (message**)malloc(sizeof(message*)*POCET_UZIVATELOV*5);
     printf("Messages OK\n");
     pthread_t* vlaknaZiadosti = (pthread_t*)malloc(sizeof(pthread_t)*POCET_UZIVATELOV);
+    printf("Vlakna OK\n");
+    client_data** logged_clients = (client_data**)malloc(sizeof(client_data*)*POCET_UZIVATELOV);
+    printf("Miesto pre klientov OK\n");
     
-    char* nick;
-    char* heslo;
-    char* komu_nick;
-    char* koho_nick;
     int uspechPrihlas, uspechRegister, uspechOdhlas, uspechVymaz, uspechPridaj, uspechZrus;
     uspechPrihlas = uspechRegister = uspechOdhlas = uspechVymaz = uspechPridaj = uspechZrus = 0;
-    char* option;
-    char* msg;                          // Navratova sprava pouzivatelovi
-    char* userMsg;                      // Sprava, ktoru chce uzivatel poslat
-    uzivatel* komu;
-    uzivatel* koho;
 
     int sockfd, newsockfd;
     socklen_t cli_len;
@@ -124,6 +119,8 @@ int main(int argc, char *argv[])
         cdata->prihlaseni = prihlaseni;
         cdata->ziadosti_zp = ziadosti_zp;
         cdata->messages = messages;
+        logged_clients[loggedInCount] = cdata;
+        loggedInCount++;
         
         pthread_t vlakno;
         vlaknaZiadosti[pocetVlakienZOP++] = vlakno;
