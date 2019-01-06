@@ -11,22 +11,10 @@
  * Created on January 3, 2019, 12:58 PM
  */
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include "menu.h"
 /*
  * 
  */
-
-typedef struct friends_p {
-    char **priatelia;
-} friends;
 
 
 int main(int argc, char** argv) {
@@ -51,13 +39,13 @@ int main(int argc, char** argv) {
 
 	if (argc < 3)
 	{
-		fprintf(stderr,"usage %s hostname port\n", argv[0]);
+	    fprintf(stderr,"usage %s hostname port\n", argv[0]);
 	}
 
 	server = gethostbyname(argv[1]);
 	if (server == NULL)
 	{
-		fprintf(stderr, "Error, no such host\n");
+            fprintf(stderr, "Error, no such host\n");
 	}
 
 	bzero((char*)&serv_addr, sizeof(serv_addr));
@@ -67,7 +55,7 @@ int main(int argc, char** argv) {
 		(char*)&serv_addr.sin_addr.s_addr,
 		server->h_length
 	);
-	serv_addr.sin_port = htons(11111);
+	serv_addr.sin_port = htons(atoi(argv[2]));
 
         sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (sockfd < 0) {
@@ -95,22 +83,24 @@ int main(int argc, char** argv) {
             
             switch (uvodnaMoznost) {
             case 1:
-                uspechPrihlasenie = prihlasenie(sockfd, serv_addr, &zoznamPriatelov, &pocetPriatelov);
+                uspechPrihlasenie = prihlasenie(sockfd, serv_addr);
                 break;
             
             case 2:
                 uspechRegistracia = registracia(sockfd, serv_addr);
+                uspechRegistracia = 0;
                 break;
                 
             case 3:
                 koniec = 1;
+                n = write(sockfd, "F", 2);
                 printf("Dakujeme za vyuzivanie nasho Chatu.\nMG&JB");
                 break;
             }
         }
         
     
-        if (uspechPrihlasenie) {
+        if (uspechPrihlasenie == 1) {
             hlavnaMoznost = hlavneMenu();
             switch(hlavnaMoznost) {
                 case 1:
@@ -118,7 +108,7 @@ int main(int argc, char** argv) {
                     break;
                     
                 case 2:
-                    //pridajPriatela();
+                    pridajPriatela(sockfd, serv_addr, zoznamPriatelov, pocetPriatelov);
                     break;
                     
                 case 3:

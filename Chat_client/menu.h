@@ -11,16 +11,29 @@
  * Created on January 3, 2019, 1:29 PM
  */
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #ifndef MENU_H
 #define MENU_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+    
+    typedef struct {
+        char **priatelia;
+    } friends;
 
     int uvodneMenu();
     
-    int prihlasenie(int sockfd, struct sockaddr_in serv_addr, void* pPriatelia, int pPocetPria);
+    int prihlasenie(int sockfd, struct sockaddr_in serv_addr);
         
     int hlavneMenu();
     
@@ -28,7 +41,7 @@ extern "C" {
 
     int napisSpravu(int sockfd, struct sockaddr_in serv_addr, void* pPriatelia, int pPocetPriatelov);
     
-    int pridajPriatela(int sockfd, struct sockaddr_in serv_addr);
+    int pridajPriatela(int sockfd, struct sockaddr_in serv_addr, friends* pPriatelia, int pPocetPriatelov);
     
     int zrusPriatelstvo(int sockfd, struct sockaddr_in serv_addr);
     
