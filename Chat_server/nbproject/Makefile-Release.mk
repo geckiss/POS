@@ -36,9 +36,7 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 # Object Files
 OBJECTFILES= \
 	${OBJECTDIR}/main.o \
-	${OBJECTDIR}/manazerUctov.o \
-	${OBJECTDIR}/server.o \
-	${OBJECTDIR}/uzivatel.o
+	${OBJECTDIR}/manazerUctov.o
 
 
 # C Compiler Flags
@@ -74,16 +72,6 @@ ${OBJECTDIR}/manazerUctov.o: manazerUctov.c
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.c) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/manazerUctov.o manazerUctov.c
-
-${OBJECTDIR}/server.o: server.c
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.c) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/server.o server.c
-
-${OBJECTDIR}/uzivatel.o: uzivatel.c
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.c) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/uzivatel.o uzivatel.c
 
 # Subprojects
 .build-subprojects:

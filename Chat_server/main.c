@@ -8,41 +8,8 @@
 #include <pthread.h>
 #include "manazerUctov.h"
 
-/*
-typedef struct uzivatel_d {
-    char* nick;                     // Dvaja s rovnakym nickom nemozu byt v chate
-    char* heslo;    
-    char** priatelia;               // Nick je unikatny, mame len 1 zoznam registrovanych
-    int pocetPriatelov;
-    int cisloSocketu;
-} uzivatel;
-
-typedef struct ziadost_op_d {       // o priatelstvo
-    uzivatel* komu;
-    uzivatel* koho;
-} ziadost_op;
-
-typedef struct ziadost_pp_d {       // pridaj priatela
-    ziadost_op* ziadost;
-    int odpoved_socket;
-} half_ziadost;
-
-typedef struct full_ziadosti_p {
-    uzivatel* komu;
-    ziadost_op** ziadosti;
-    int pocetZiadosti;
-    int odpoved_socket;
-} full_ziadost;
-
-typedef struct message_p {
-    uzivatel* komu;
-    uzivatel* koho;
-    char* msg;
-} message;
-*/
-int pocetVlakienZOP = 0;
+int pocetVlakien = 0;
 int loggedInCount = 0;
-//int prihlasenie(const char* nick, const char* heslo);,
 
 int main(int argc, char *argv[])
 {
@@ -51,19 +18,25 @@ int main(int argc, char *argv[])
     // aby tam hlavne vlakno nepridalo novu pri posielani, by sa poslal komu???
     printf("Zaciname\n");
     uzivatel** registrovani = (uzivatel**)malloc(sizeof(uzivatel*)*POCET_UZIVATELOV);
-    printf("Registrovani OK\n");
     uzivatel** prihlaseni = (uzivatel**)malloc(sizeof(uzivatel*)*POCET_UZIVATELOV);
-    printf("Prihlaseni OK\n");
-    ziadost_op** ziadosti_op = (ziadost_op**)malloc(sizeof(ziadost_op*)*(POCET_UZIVATELOV-1));
-    printf("Ziadosti OP OK\n");
-    half_ziadost** ziadosti_zp = (half_ziadost**)malloc(sizeof(half_ziadost*)*(POCET_UZIVATELOV-1));
-    printf("Ziadosti ZP OK\n");
-    message** messages = (message**)malloc(sizeof(message*)*POCET_UZIVATELOV*5);
-    printf("Messages OK\n");
-    pthread_t* vlaknaZiadosti = (pthread_t*)malloc(sizeof(pthread_t)*POCET_UZIVATELOV);
-    printf("Vlakna OK\n");
+    thread_data** vlakna = (thread_data**)malloc(sizeof(thread_data*)*POCET_UZIVATELOV);
     client_data** logged_clients = (client_data**)malloc(sizeof(client_data*)*POCET_UZIVATELOV);
-    printf("Miesto pre klientov OK\n");
+    printf("Struktury OK\n");
+    
+    pthread_mutex_t mutex_register;
+    pthread_mutex_init(&mutex_register, NULL);
+    pthread_mutex_t mutex_prihlas;
+    pthread_mutex_init(&mutex_prihlas, NULL);
+    pthread_mutex_t mutex_ziadosti_op;
+    pthread_mutex_init(&mutex_ziadosti_op, NULL);
+    pthread_mutex_t mutex_ziadosti_zp;
+    pthread_mutex_init(&mutex_ziadosti_zp, NULL);
+    pthread_mutex_t mutex_clients;
+    pthread_mutex_init(&mutex_clients, NULL);
+    pthread_mutex_t mutex_vlakna;
+    pthread_mutex_init(&mutex_vlakna, NULL);
+    pthread_mutex_t mutex_spravy;
+    pthread_mutex_init(&mutex_spravy, NULL);
     
     int uspechPrihlas, uspechRegister, uspechOdhlas, uspechVymaz, uspechPridaj, uspechZrus;
     uspechPrihlas = uspechRegister = uspechOdhlas = uspechVymaz = uspechPridaj = uspechZrus = 0;
@@ -102,6 +75,37 @@ int main(int argc, char *argv[])
     listen(sockfd, 5);
     while (1) {
         
+        for (int i = 0; i < pocetVlakien; i++) {
+            thread_data* vlakno_data = vlakna[i];
+            if (vlakno_data->skoncene == 1) {
+                int index = vlakno_data->my_client->index;
+                free(vlakno_data->my_client->nick);
+                free(vlakno_data->my_client->heslo);
+                
+                //swap na koniec
+                client_data* pom = logged_clients[index];
+                pthread_mutex_lock(&mutex_clients);
+                logged_clients[index] = logged_clients[loggedInCount - 1];
+                logged_clients[loggedInCount - 1] = NULL;
+                --loggedInCount;
+                pthread_mutex_unlock(&mutex_clients);
+                free(vlakno_data->my_client);
+                
+                // swap na koniec
+                pthread_mutex_lock(&mutex_vlakna);
+                vlakna[i] = vlakna[pocetVlakien];
+                vlakna[pocetVlakien] = NULL;
+
+                
+                pthread_detach(vlakno_data->vlaknoId);
+                free(vlakno_data);
+                --pocetVlakien;
+                pthread_mutex_unlock(&mutex_vlakna);
+                printf("Vlakno %d aj cdata uvolnene\n", vlakno_data->vlaknoId);
+                usleep(1000000);
+            }
+        }
+        
         cli_len = sizeof (cli_addr);
         printf("Cakam na accept\n");
         newsockfd = accept(sockfd, (struct sockaddr*) &cli_addr, &cli_len);
@@ -110,30 +114,47 @@ int main(int argc, char *argv[])
             return 3;
         }
         printf("Accept OK\n");
+       
         client_data* cdata = (client_data*) malloc(sizeof (client_data));
         cdata->socket = newsockfd;
         cdata->nick = (char*)malloc(sizeof(char)*20);
         cdata->heslo = (char*)malloc(sizeof(char)*20);
-        cdata->ziadosti_op = ziadosti_op;
         cdata->registrovani = registrovani;
         cdata->prihlaseni = prihlaseni;
-        cdata->ziadosti_zp = ziadosti_zp;
-        cdata->messages = messages;
-        logged_clients[loggedInCount] = cdata;
-        loggedInCount++;
+        cdata->uspech = 0;
+        cdata->index = loggedInCount;
+        
+        pthread_mutex_lock(&mutex_clients);
+        logged_clients[loggedInCount++] = cdata;
+        pthread_mutex_unlock(&mutex_clients);
+        
         
         pthread_t vlakno;
-        vlaknaZiadosti[pocetVlakienZOP++] = vlakno;
-        printf("Idem do vlakna\n\n");
-        pthread_create(&vlakno, NULL, &obsluzClienta, cdata);
+        thread_data* thread_d = (thread_data*)malloc(sizeof(thread_data));
+        thread_d->vlaknoId = vlakno;
+        thread_d->skoncene = 0;
+        thread_d->my_client = cdata;
+        thread_d->mutex_register = &mutex_register;
+        thread_d->mutex_prihlas = &mutex_prihlas;
+        thread_d->mutex_ziadosti_op = &mutex_ziadosti_op;
+        thread_d->mutex_ziadosti_zp = &mutex_ziadosti_zp;
+        thread_d->mutex_spravy = &mutex_spravy;
+        
+        pthread_mutex_lock(&mutex_vlakna);
+        vlakna[pocetVlakien++] = thread_d;
+        pthread_mutex_unlock(&mutex_vlakna);
+        
+        printf("Idem do vlakna %d\n\n", vlakno);
+        pthread_create(&vlakno, NULL, &obsluzClienta, thread_d);
     }
-    // koniec while-u ???
-
-
-    // TODO vsetky sockety uzivatelov zatvorit
-    // TODO vycisti struktury
-    // close vracia int
     
+    pthread_mutex_destroy(&mutex_register);
+    pthread_mutex_destroy(&mutex_prihlas);
+    pthread_mutex_destroy(&mutex_ziadosti_op);
+    pthread_mutex_destroy(&mutex_ziadosti_zp);
+    pthread_mutex_destroy(&mutex_clients);
+    pthread_mutex_destroy(&mutex_vlakna);
+    pthread_mutex_destroy(&mutex_spravy);
     close(sockfd);
     return 0;
 }

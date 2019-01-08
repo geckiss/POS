@@ -22,81 +22,58 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
-typedef struct {
-    char* nick;                     // Dvaja s rovnakym nickom nemozu byt v chate
-    char* heslo;    
-    char** priatelia;               // Nick je unikatny, mame len 1 zoznam registrovanych
-    int pocetPriatelov;
-    int cisloSocketu;
-} uzivatel;
 
-typedef struct {       // o priatelstvo
-    uzivatel* komu;
-    uzivatel* koho;
-} ziadost_op;
+    typedef struct {
+        char* od_koho;
+        char* msg;
+    } message;
 
-typedef struct {       // pridaj priatela
-    ziadost_op* ziadost;
-    int odpoved_socket;
-} half_ziadost;
+    typedef struct {
+        char* nick;             // Dvaja s rovnakym nickom nemozu byt v chate
+        char* heslo;
+        char** priatelia;       // Nick je unikatny, mame len 1 zoznam registrovanych
+        int pocetPriatelov;
+        char** ziadosti_op;
+        int pocetZiadostiOP;
+        char** ziadosti_zp;     // O zrusenie priatelstva
+        int pocetZiadostiZP;
+        int cisloSocketu;
+        message** messages;
+        int pocetSprav;
+    } uzivatel;
 
-typedef struct {
-    uzivatel* komu;
-    ziadost_op** ziadosti;
-    int pocetZiadosti;
-    int odpoved_socket;
-} full_ziadost;
+    typedef struct {
+        char *buffer;
+        char *nick; // temp
+        char *heslo; // temp
+        char* komu_nick;
+        char* koho_nick;
+        int uspech;
+        char* option;
+        char* msg; // Navratova sprava pouzivatelovi
+        char* userMsg;
+        int socket;
+        int index;
+        uzivatel** prihlaseni;
+        uzivatel** registrovani;
+    } client_data;
 
-typedef struct {
-    uzivatel* komu;
-    uzivatel* koho;
-    char* msg;
-} message;
+    typedef struct {
+        int vlaknoId;
+        int skoncene;
+        client_data* my_client;
+        pthread_mutex_t *mutex_register;
+        pthread_mutex_t *mutex_prihlas;
+        pthread_mutex_t *mutex_ziadosti_op;
+        pthread_mutex_t *mutex_ziadosti_zp;
+        pthread_mutex_t *mutex_spravy;
+    } thread_data;
 
-typedef struct {
-    char *buffer;
-    char *nick;
-    char *heslo;
-    char* komu_nick;
-    char* koho_nick;
-    int uspech;
-    char* option;
-    char* msg;                          // Navratova sprava pouzivatelovi
-    char* userMsg;
-    int socket;
-    uzivatel** prihlaseni;
-    uzivatel** registrovani;
-    ziadost_op** ziadosti_op;
-    half_ziadost** ziadosti_zp;
-    message** messages;
-} client_data;
+    void* najdiUziPodlaNicku(char* nick, uzivatel** registrovani_p);
 
-int prihlasenie(char* prihlasNick, char* prihlasHeslo, uzivatel** prihlaseni_p, uzivatel** registrovani_p);
+    void* jePrihlaseny(char* nick, uzivatel** prihlaseni_p);
 
-int odhlasenie(char* nick, uzivatel** prihlaseni_p);
-
-int registracia(const char* registrujNick, const char* registrujHeslo, uzivatel** registrovani_p, int socket);
-
-int zrusenieUctu(char* zrusNick, uzivatel** registrovani_p);
-
-void swapOdhlasenie(int indexNekoncovy, void* prihlaseni_p);
-
-void swapZrusenie(int indexNekoncovy, void* registrovani_p);
-
-void* pridajPriatela(void* pdata);
-
-void* zrusPriatela(void* pdata);
-
-void vypisPriatelov(void* uziv);
-
-void* posliZiadosti(full_ziadost* pdata);
-
-void* najdiUziPodlaNicku(const char* nick, void* registrovani_p);
-
-void* jePrihlaseny(char* nick, uzivatel** prihlaseni_p);
-
-void* obsluzClienta(void* pdata);
+    void* obsluzClienta(void* pdata);
 
 #ifdef __cplusplus
 }

@@ -1,3 +1,14 @@
+CC=gcc
+CFLAGS=-I.
+DEPS = manazerUctov.h
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+chat: main.o manazerUctov.o 
+	$(CC) -pthread -o chat main.o manazerUctov.o
+
+
 #
 #  There exist several targets which are by default empty and which can be 
 #  used for execution of your targets. These targets are usually executed 
